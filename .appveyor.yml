@@ -1,0 +1,42 @@
+build: false
+
+platform:
+  - x64
+
+image:
+  - Visual Studio 2017
+
+environment:
+  matrix:
+    - MINICONDA: C:\\xeus-conda
+
+init:
+  - "ECHO %MINICONDA%"
+  - if "%APPVEYOR_BUILD_WORKER_IMAGE%" == "Visual Studio 2015" set VCVARPATH="C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat"
+  - if "%APPVEYOR_BUILD_WORKER_IMAGE%" == "Visual Studio 2015" set VCARGUMENT=%PLATFORM%
+  - if "%APPVEYOR_BUILD_WORKER_IMAGE%" == "Visual Studio 2017" set VCVARPATH="C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars64.bat"
+  - echo "%VCVARPATH% %VCARGUMENT%"
+  - "%VCVARPATH% %VCARGUMENT%"
+  - ps: Start-FileDownload 'http://repo.continuum.io/miniconda/Miniconda3-latest-Windows-x86_64.exe' C:\Miniconda.exe; echo "Done"
+  - cmd: C:\Miniconda.exe /S /D=C:\xeus-conda
+  - "set PATH=%MINICONDA%;%MINICONDA%\\Scripts;%MINICONDA%\\Library\\bin;%PATH%"
+
+install:
+  - conda config --set always_yes yes --set changeps1 no
+  - conda update -q conda
+  - conda info -a
+  # Install dependencies
+  - conda install cmake dirent xeus=2.0.0 cling=0.8 clangdev=5 llvmdev=5 nlohmann_json cppzmq xtl=0.7.2 pugixml cxxopts=2.1.2 -c conda-forge
+  # Build and install xeus-cling
+  - mkdir build
+  - cd build
+  - cmake -G "NMake Makefiles" -D CMAKE_INSTALL_PREFIX=%MINICONDA%\\Library -D CMAKE_BUILD_TYPE=Release -D XEXTRA_JUPYTER_DATA_DIR=%MINICONDA%\\share\\jupyter -D DOWNLOAD_GTEST=ON ..
+  - nmake
+  - nmake install
+  # Install jupyter_kernel_test and pytest
+  - conda install pytest jupyter_kernel_test -c conda-forge
+
+build_script:
+  - cd test
+  - test_xeus_cling
+  - cd.. && cd.. && cd test && py.test . & exit 0
